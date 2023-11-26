@@ -6,20 +6,23 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/boltdb/bolt"
+	"go-blockchain/constents"
+	"go-blockchain/utils"
 	"log"
 	"os"
-
-	"github.com/boltdb/bolt"
+	"strconv"
 )
 
 const dbFile = "blockchain_%s.db"
 const blocksBucket = "blocks"
-const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
+const genesisCoinbaseData = "the genesisCoinbaseData"
 
 // Blockchain implements interactions with a DB
 type Blockchain struct {
-	tip []byte
-	DB  *bolt.DB
+	tip    []byte
+	DB     *bolt.DB
+	Height int
 }
 
 // CreateBlockchain creates a new blockchain DB
@@ -55,6 +58,20 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 		if err != nil {
 			log.Panic(err)
 		}
+
+		// 初始化链高度
+		height := 1
+
+		err = b.Put([]byte(constants.BlockchainHeightKey), []byte(strconv.Itoa(height)))
+		if err != nil {
+			log.Panic(err)
+		}
+		redis := utils.NewRedisClient()
+		err = redis.SetIntValue(constants.BlockchainHeightKey, height)
+		if err != nil {
+			log.Panic(err)
+		}
+
 		tip = genesis.Hash
 
 		return nil
@@ -63,7 +80,7 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 		log.Panic(err)
 	}
 
-	bc := Blockchain{tip, db}
+	bc := Blockchain{tip, db, 1} // 初始化区块高度为1
 
 	return &bc
 }
@@ -91,10 +108,48 @@ func NewBlockchain(nodeID string) *Blockchain {
 	if err != nil {
 		log.Panic(err)
 	}
+	redis := utils.NewRedisClient()
+	// 从 Redis 中获取区块高度
+	height, err := redis.GetIntValueByKey(constants.BlockchainHeightKey)
+	if err != nil {
+		// 如果 Redis 中不存在区块高度，则从 BoltDB 中读取并写入 Redis
+		height, err = GetBlockchainHeightFromBoltDB(db)
+		if err != nil {
+			log.Panic(err)
+		}
+		err = redis.SetIntValue(constants.BlockchainHeightKey, height)
+		if err != nil {
+			log.Panic(err)
+		}
+	}
 
-	bc := Blockchain{tip, db}
+	bc := Blockchain{tip, db, height}
 
 	return &bc
+}
+
+// getBlockchainHeightFromBoltDB 从 BoltDB 中获取区块高度
+func GetBlockchainHeightFromBoltDB(db *bolt.DB) (int, error) {
+	var height int
+
+	err := db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte(blocksBucket))
+		heightBytes := b.Get([]byte(constants.BlockchainHeightKey))
+
+		var err error
+		height, err = strconv.Atoi(string(heightBytes))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return height, nil
 }
 
 // AddBlock saves the block into the blockchain
@@ -123,6 +178,19 @@ func (bc *Blockchain) AddBlock(block *Block) {
 				log.Panic(err)
 			}
 			bc.tip = block.Hash
+			// 更新BoltDB中存储的BlockchainHeight
+
+			err = b.Put([]byte(constants.BlockchainHeightKey), []byte(strconv.Itoa(block.Height+1)))
+			if err != nil {
+				log.Panic(err)
+			}
+
+			// 同步更新Redis中存储的BlockchainHeight
+			redis := utils.NewRedisClient()
+			err = redis.SetIntValue(constants.BlockchainHeightKey, block.Height+1)
+			if err != nil {
+				log.Panic(err)
+			}
 		}
 
 		return nil
@@ -267,6 +335,7 @@ func (bc *Blockchain) GetBlockHashes() [][]byte {
 
 // MineBlock mines a new block with the provided transactions
 func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
+
 	var lastHash []byte
 	var lastHeight int
 
@@ -307,6 +376,22 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 		}
 
 		bc.tip = newBlock.Hash
+
+		height, err := GetBlockchainHeightFromBoltDB(bc.DB)
+		if err != nil {
+			log.Panic(err)
+		}
+		err = b.Put([]byte(constants.BlockchainHeightKey), []byte(strconv.Itoa(height+1)))
+		if err != nil {
+			log.Panic(err)
+		}
+
+		// 同步更新Redis中存储的BlockchainHeight
+		redis := utils.NewRedisClient()
+		err = redis.SetIntValue(constants.BlockchainHeightKey, height+1)
+		if err != nil {
+			log.Panic(err)
+		}
 
 		return nil
 	})

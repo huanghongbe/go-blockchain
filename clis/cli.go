@@ -21,6 +21,7 @@ func (cli *CLI) printUsage() {
 	fmt.Println("  reindexutxo - Rebuilds the UTXO set")
 	fmt.Println("  send -from FROM -to TO -amount AMOUNT -mine - Send AMOUNT of coins from FROM address to TO. Mine on the same node, when -mine is set.")
 	fmt.Println("  startnode -miner ADDRESS - Start a node with ID specified in NODE_ID env. var. -miner enables mining")
+	fmt.Println("  getchainheight")
 }
 
 func (cli *CLI) validateArgs() {
@@ -49,6 +50,8 @@ func (cli *CLI) Run() {
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 	startNodeCmd := flag.NewFlagSet("startnode", flag.ExitOnError)
 
+	getChainHeightCmd := flag.NewFlagSet("getchainheight", flag.ExitOnError)
+
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
@@ -58,6 +61,12 @@ func (cli *CLI) Run() {
 	startNodeMiner := startNodeCmd.String("miner", "", "Enable mining mode and send reward to ADDRESS")
 
 	switch os.Args[1] {
+	case "getchainheight":
+		log.Println("start to get chain height")
+		err := getChainHeightCmd.Parse(os.Args[2:]) // 解析空参数列表
+		if err != nil {
+			log.Panic(err)
+		}
 	case "getbalance":
 		err := getBalanceCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -103,6 +112,9 @@ func (cli *CLI) Run() {
 		os.Exit(1)
 	}
 
+	if getChainHeightCmd.Parsed() {
+		cli.getChainHeight(nodeID)
+	}
 	if getBalanceCmd.Parsed() {
 		if *getBalanceAddress == "" {
 			getBalanceCmd.Usage()
