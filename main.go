@@ -8,7 +8,9 @@ import (
 )
 
 func main() {
-	//testNewBLock()
+	//
+	//bc := models.NewBlockchain("3000")
+	//models.GetDifficulty(bc)
 
 	cli := clis.CLI{}
 	cli.Run()

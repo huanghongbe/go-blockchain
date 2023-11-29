@@ -36,7 +36,7 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 	var tip []byte
 
 	cbtx := NewCoinbaseTX(address, genesisCoinbaseData)
-	genesis := NewGenesisBlock(cbtx)
+	genesis := NewGenesisBlock(cbtx, nil)
 
 	db, err := bolt.Open(dbFile, 0600, nil)
 	if err != nil {
@@ -61,11 +61,19 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 
 		// 初始化链高度
 		height := 1
+		// 一开始没有区块 duration = 0 (单位ms)
+		duration := 0
 
 		err = b.Put([]byte(constants.BlockchainHeightKey), []byte(strconv.Itoa(height)))
 		if err != nil {
 			log.Panic(err)
 		}
+
+		err = b.Put([]byte(constants.TenBlockDuration), []byte(strconv.Itoa(duration)))
+		if err != nil {
+			log.Panic(err)
+		}
+
 		redis := utils.NewRedisClient()
 		err = redis.SetIntValue(constants.BlockchainHeightKey, height)
 		if err != nil {
@@ -83,6 +91,14 @@ func CreateBlockchain(address, nodeID string) *Blockchain {
 	bc := Blockchain{tip, db, 1} // 初始化区块高度为1
 
 	return &bc
+}
+
+func ExistBlockchain(nodeID string) bool {
+	dbFile := fmt.Sprintf(dbFile, nodeID)
+	if dbExists(dbFile) == false {
+		return false
+	}
+	return true
 }
 
 // NewBlockchain creates a new Blockchain with genesis Block
@@ -361,7 +377,7 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) *Block {
 		log.Panic(err)
 	}
 
-	newBlock := NewBlock(transactions, lastHash, lastHeight+1)
+	newBlock := NewBlock(transactions, lastHash, lastHeight+1, bc)
 
 	err = bc.DB.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))

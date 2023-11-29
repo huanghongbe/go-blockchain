@@ -32,6 +32,8 @@ func (cli *CLI) send(from, to string, amount int, nodeID string, mineNow bool) {
 		txs := []*models.Transaction{cbTx, tx}
 
 		newBlock := bc.MineBlock(txs)
+
+		print(newBlock)
 		UTXOSet.Update(newBlock)
 	} else {
 		server.SendTx(server.KnownNodes[0], tx)

@@ -168,6 +168,7 @@ func sendVersion(addr string, bc *models.Blockchain) {
 	request := append(commandToBytes("version"), payload...)
 
 	sendData(addr, request)
+
 }
 
 func handleAddr(request []byte) {
@@ -344,6 +345,14 @@ func handleTx(request []byte, bc *models.Blockchain) {
 
 			fmt.Println("New block is mined!")
 
+			fmt.Println("Block Information:")
+			fmt.Println("Hash : ", newBlock.Hash)
+			fmt.Println("PreHash : ", newBlock.PrevBlockHash)
+			fmt.Println("Difficulty: ", newBlock.Difficulty)
+			fmt.Println("Height : ", newBlock.Height)
+			fmt.Println("Timestamp : ", newBlock.Timestamp)
+			fmt.Println("Nonce : ", newBlock.Nonce)
+
 			for _, tx := range txs {
 				txID := hex.EncodeToString(tx.ID)
 				delete(mempool, txID)
@@ -388,7 +397,7 @@ func handleVersion(request []byte, bc *models.Blockchain) {
 	}
 }
 
-func handleConnection(conn net.Conn, bc *models.Blockchain) {
+func handleConnection(conn net.Conn, bc *models.Blockchain, nodeID string) {
 	request, err := ioutil.ReadAll(conn)
 	if err != nil {
 		log.Panic(err)
@@ -439,7 +448,7 @@ func StartServer(nodeID, minerAddress string) {
 		if err != nil {
 			log.Panic(err)
 		}
-		go handleConnection(conn, bc)
+		go handleConnection(conn, bc, nodeID)
 	}
 }
 
