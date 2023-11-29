@@ -4,10 +4,10 @@
 - go@1.18及以下
 ## 测试
 - 终端一
-  - export NODE_ID=3000
+  - export NODE_ID=3000 //windows用set替换export
   - ./go-blockchain createwallet // 将在终端上生成一个钱包地址，下面简称CENTREAL_NODE
   - ./go-blockchain createblockchain -address CENTREAL_NODE
-  - cp blockchain_3000.db blockchain_genesis.db
+  - cp blockchain_3000.db blockchain_genesis.db // windows用copy替换cp
 - 终端二 
   - export NODE_ID=3001
   - cp blockchain_genesis.db blockchain_3001.db
